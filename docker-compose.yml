@@ -1,0 +1,59 @@
+version: "3"
+services:
+  php:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    volumes:
+    - "./:/var/www/ny"
+    depends_on:
+    - mysql
+    links:
+    - mysql
+
+  nginx:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    volumes:
+    - "./:/var/www/ny"
+    depends_on:
+    - php
+    links:
+    - php
+    ports:
+    - "80:80"
+
+  composer:
+    build:
+      context: ./docker/composer
+      dockerfile: Dockerfile
+    volumes:
+    - "./:/var/www/ny"
+
+  console:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    volumes:
+    - "./:/var/www/ny"
+    command: ""
+    entrypoint: ["./bin/console"]
+    depends_on:
+    - mysql
+    links:
+    - mysql
+
+  mysql:
+    image: mysql:5
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+
+  phpunit:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    volumes:
+    - "./:/var/www/ny"
+    command: ""
+    entrypoint: ["./vendor/bin/phpunit"]
