@@ -40,16 +40,27 @@ class TasksWriterTest extends TestCase
     private $loggerMock;
 
     /**
+     * @var ConstraintViolationListInterface|MockObject
+     */
+    private $validationErrorsMock;
+
+    /**
      * @var TasksWriter
      */
     private $tasksWriter;
 
     protected function setUp()
     {
-        $this->entityManagerMock = $this->createMock(EntityManagerInterface::class);
-        $this->validatorMock     = $this->createMock(ValidatorInterface::class);
-        $this->tasksReaderMock   = $this->createMock(TasksReading::class);
-        $this->loggerMock        = $this->createMock(LoggerInterface::class);
+        $this->entityManagerMock    = $this->createMock(EntityManagerInterface::class);
+        $this->validatorMock        = $this->createMock(ValidatorInterface::class);
+        $this->tasksReaderMock      = $this->createMock(TasksReading::class);
+        $this->loggerMock           = $this->createMock(LoggerInterface::class);
+        $this->validationErrorsMock = $this->createMock(ConstraintViolationListInterface::class);
+
+        $this
+            ->validatorMock
+            ->method('validate')
+            ->willReturn($this->validationErrorsMock);
 
         $this->tasksWriter = new TasksWriter(
             $this->entityManagerMock,
@@ -73,7 +84,10 @@ class TasksWriterTest extends TestCase
             ->validatorMock
             ->expects(self::once())
             ->method('validate')
-            ->with($taskRequest);
+            ->with($taskRequest)
+            ->willReturn($this->validationErrorsMock);
+
+        $this->validatorWillNotReturnErrors();
 
         $this->tasksWriter->save($taskRequest);
     }
@@ -96,6 +110,11 @@ class TasksWriterTest extends TestCase
             ->method('validate')
             ->willReturn($validationErrors);
 
+        $this
+            ->validationErrorsMock
+            ->method('count')
+            ->willReturn(1);
+
         $this->tasksWriter->save($taskRequest);
     }
 
@@ -104,6 +123,8 @@ class TasksWriterTest extends TestCase
      */
     public function persistsTask(): void
     {
+        $this->validatorWillNotReturnErrors();
+
         $taskRequest = new TaskRequest();
         $taskRequest
             ->setName('Task')
@@ -132,6 +153,8 @@ class TasksWriterTest extends TestCase
      */
     public function flushesEntityManagerAfterPersistingTask(): void
     {
+        $this->validatorWillNotReturnErrors();
+
         $taskRequest = new TaskRequest();
         $taskRequest
             ->setName('Task')
@@ -155,6 +178,8 @@ class TasksWriterTest extends TestCase
      */
     public function returnsSavedTask(): void
     {
+        $this->validatorWillNotReturnErrors();
+
         $now = Carbon::now();
 
         $taskRequest = new TaskRequest();
@@ -173,6 +198,8 @@ class TasksWriterTest extends TestCase
      */
     public function ifTaskIdIsPassedUpdateExistingTaskInsteadCreatingNewOne(): void
     {
+        $this->validatorWillNotReturnErrors();
+
         $yesterday = Carbon::yesterday();
 
         $task = new Task();
@@ -204,11 +231,26 @@ class TasksWriterTest extends TestCase
      */
     public function ifTaskIdIsPassedButTaskDoesNotExistThrowTaskNotFoundException(): void
     {
+        $this->validatorWillNotReturnErrors();
+
         $this
             ->tasksReaderMock
             ->method('get')
             ->willReturn(null);
 
         $this->tasksWriter->save(new TaskRequest(), self::TASK_ID);
+    }
+
+    /**
+     * @return TasksWriterTest
+     */
+    private function validatorWillNotReturnErrors(): self
+    {
+        $this
+            ->validationErrorsMock
+            ->method('count')
+            ->willReturn(0);
+
+        return $this;
     }
 }
